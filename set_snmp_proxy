@@ -1,0 +1,83 @@
+
+from gettext import gettext
+import snmp_mgr
+import logging
+import sys
+
+def set_snmp_proxy_help():
+    msg = gettext('Usage:\n')
+    msg += gettext('  set_snmp_proxy -n <proxy name> -p <port number> \n')
+    msg += gettext('  Set snmp proxy for device\n')
+    msg += gettext('  Eg. set_snmp_proxy -v 1 -n ctx_remotehost1 -t cmty_remotehost1 -T public -i 9.114.200.97')
+    msg += gettext('      set_snmp_proxy -v 3 -n ctx_remotehost2 -u MD5DESUser -a MD5'+\
+                   "-A PasswordA -x DES -X PasswordX -l level -i 9.114.200.97 \n\n" )
+    msg += gettext('Options:\n')
+    msg += gettext('  -h, \t\t\t display the help message and exit\n')    
+    msg += gettext('  -i, \t\t\t the ip address of the new snmp server for v1&v3\n')  
+    msg += gettext('  -v, \t\t\t the snmp version 1 or 3\n')
+    msg += gettext('  -n, \t\t\t context name (e.g. bridge1 for v3, ctx_remotehost1 for v1), for v1&v3\n')  
+    msg += gettext('  -t, \t\t\t the name of context community, for v1&v3 \n' )
+    msg += gettext('  -T, \t\t\t the name of device community, for v1&v3 \n')
+    msg += gettext('  -a, \t\t\t authentication protocol (MD5|SHA), for v3 \n')
+    msg += gettext('  -A, \t\t\t authentication protocol pass phrase, for v3 \n')
+    msg += gettext('  -l, \t\t\t security level (noAuthNoPriv|authNoPriv|authPriv), for v3 \n')
+    msg += gettext('  -u, \t\t\t security name (e.g. bert), for v3 \n')
+    msg += gettext('  -x, \t\t\t privacy protocol (DES|AES), for v3 \n')
+    msg += gettext('  -X, \t\t\t privacy protocol pass phrase, for v3 \n')
+    msg += gettext(message)
+    return msg
+
+def set_snmp_proxy_cli(argv):
+    SHORT_OPTIONS = 'i:h:v:n:t:T:a:A:l:u:x:X'
+    LONG_OPTIONS = ['ip', 'help', 'version', 'context', 'cmty_name', 'community', 'auth_protocol', 'auth_pass_phrase', \
+                    'level', 'user', 'privacy_protocol', 'privacy_pass_phrase']
+    try:
+        opts, args = getopt(argv, SHORT_OPTIONS, LONG_OPTIONS)
+    except GetoptError as err:
+        message = set_snmp_proxy_help()
+        return -1, message
+    if args:
+        return -1, set_snmp_proxy_help()
+    for opt_value, arg_value in opts:
+        if opt_value in ('-h', '--help'):
+            return 0, set_snmp_proxy_help()
+        if opt_value in ('-v', '--version'):
+            snmp_version = arg_value
+        if opt_value in ('-i', '--ip'):
+            ip = arg_value
+        if opt_value in ('-v', '--version'):
+            snmp_version = arg_value    
+        if opt_value in ('-n', '--context'):
+            ctx_name = arg_value
+        if opt_value in ('-t', '--cmty_name'):
+            cmty_name = arg_value
+        if opt_value in ('-T', '--community'):
+            community = arg_value    
+        if opt_value in ('-u', '--user'):
+            user = arg_value
+        if opt_value in ('-a', '--auth_protocol'):
+            auth_protocol = arg_value
+        if opt_value in ('-A', '--auth_pass_phrase'):
+            auth_pass_phrase = arg_value
+        if opt_value in ('-x', '--privacy_protocol'):
+            privacy_protocol = arg_value
+        if opt_value in ('-X', '--privacy_pass_phrase'):
+            privacy_pass_phrase = arg_value  
+        if opt_value in ('-l', '--level'):
+            level = arg_value 
+     
+#   TODO: precheck before use the set_snmp_proxy_v?                                              
+    if (snmp_version == 1):
+        return snmp_mgr.set_snmp_proxy_v1(ctx_name, cmty_name, community, ip)
+    elif (snmp_version == 3):
+        return snmp_mgr.set_snmp_proxy_v3(ctx_name, user, auth_protocol, auth_pass_phrase, privacy_protocol, \
+                                          privacy_pass_phrase, level, ip)
+    else:
+        return -1, gettext('The arguments are not illegal, please check')
+
+if __name__ == '__main__':
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", filename="/var/log/puremgr_snmp.log", level=logging.INFO)
+    rc, message = set_snmp_proxy_cli(sys.argv[1:])
+    if message:
+        print(message)
+    exit(rc)  
