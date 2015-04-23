@@ -1,0 +1,46 @@
+
+from gettext import gettext
+import snmp_mgr
+import logging
+import sys
+from getopt import getopt, GetoptError
+
+def include_MIB_help():
+    msg = gettext('Usage:\n')
+    msg += gettext('  include_MIB\n')
+    msg += gettext('  include all MIB files to net-snmp\n\n')
+    msg += gettext('  eg. include_MIB -a y')
+    msg += gettext('Options:\n')
+    msg += gettext('  -a, \t\t\t include all MIB files or not\n')
+#    msg += gettext('  -n, \t\t\t the name of specific MIB file')
+    msg += gettext('  -h, \t\t\t display the help message and exit\n')   
+    return msg
+
+def include_MIB_cli(argv):
+    _METHOD_ = 'include_MIB.include_MIB_cli'
+    SHORT_OPTIONS = 'a:h'
+    LONG_OPTIONS = ['all', 'help']
+    try:
+        opts, args = getopt(argv, SHORT_OPTIONS, LONG_OPTIONS)
+    except GetoptError as err:
+        message = include_MIB_help()
+        return -1, message
+    if args:
+        return -1, include_MIB_help()
+    for opt_value, arg_value in opts:
+        if opt_value in ('-h', '--help'):
+            return 0, include_MIB_help()
+        if opt_value in ('-a', '--all'):
+            all = arg_value
+    
+    '''TODO: we only implement "add all the MIB files" now. Will implement "add specific MIB file" in future'''        
+    if all is not 'y':
+        return -1, 'the action is not supported now, please change use "-a y"'
+    return snmp_mgr.include_MIB(all)        
+
+if __name__ == '__main__':
+#     logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s",filename="/var/log/puremgr_snmp.log", level=logging.INFO)
+    rc, message = include_MIB_cli(sys.argv[1:])
+    if message:
+        print(message)
+    exit(rc)    
