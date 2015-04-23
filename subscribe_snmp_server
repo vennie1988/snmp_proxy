@@ -1,0 +1,43 @@
+
+from gettext import gettext
+import snmp_mgr
+import logging
+import sys
+
+def subscribe_snmp_server_help():
+    msg = gettext('Usage:\n')
+    msg += gettext('  subscribe_snmp_server -i <ip_address> -p <port number> \n')
+    msg += gettext('  Forward the traps in PurePower Manager to a new snmp server\n')
+    msg += gettext('  Eg. subscribe_snmp_server -i 9.114.170.114 -p 161\n\n')
+    msg += gettext('Options:\n')
+    msg += gettext('  -i, \t\t\t the ip address of the new snmp server\n')
+    msg += gettext('  -p, \t\t\t the port which is listening traps\n')
+    msg += gettext('  -h, \t\t\t display the help message and exit\n')
+    return msg
+
+def subscribe_snmp_server(argv):
+    _METHOD_ = 'include_MIB.include_MIB_cli'
+    SHORT_OPTIONS = 'i:p:h'
+    LONG_OPTIONS = ['ip', 'port', 'help']
+    try:
+        opts, args = getopt(argv, SHORT_OPTIONS, LONG_OPTIONS)
+    except GetoptError as err:
+        message = subscribe_snmp_server_help()
+        return -1, message
+    if args:
+        return -1, subscribe_snmp_server_help()
+    for opt_value, arg_value in opts:
+        if opt_value in ('-h', '--help'):
+            return 0, subscribe_snmp_server_help()
+        if opt_value in ('-p', '--port'):
+            port = arg_value
+        if opt_value in ('-i', '--ip'):
+            ip = arg_value    
+    return snmp_mgr.subscribe_snmp_server(ip, port)
+
+if __name__ == '__main__':
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", filename="/var/log/puremgr_snmp.log", level=logging.INFO)
+    rc, message = subscribe_snmp_server(sys.argv[1:])
+    if message:
+        print(message)
+    exit(rc)  
