@@ -1,0 +1,175 @@
+
+import os
+import re
+import logging
+import socket
+from gettext import gettext
+
+SNMP_CONF_FILE = "snmp.conf"
+SNMPD_CONF_FILE = "snmpd.conf"
+SNMPTRAPD_CONF_FILE = "snmptrapd.conf"
+SNMP_CONF_DEFAULT_POSITION = "/etc/snmp"
+INCLUDE_MIB_COMMAND = "mibs +ALL\n"
+DEFAULT_COMMUNITY_NAME = "public"
+FORWARD_TRAPS_COMMAND = "forward default "
+
+def _stop_snmpd_service():
+    os.popen("service snmpd stop")
+    if(os.popen("echo $?").read() == "0\n"):
+        logging.info("have stopped the snmpd service")
+    else:
+        logging.warning("Exception occurs when stop snmpd service")
+    return
+
+def _start_snmpd_service():
+    os.popen("service snmpd start")
+    if(os.popen("echo $?").read() == "0\n"):
+        logging.info("have started the snmpd service")
+    else:
+        logging.warning("Exception occurs when start snmpd service")
+    return
+
+def _stop_snmptrapd_service():
+    result = os.popen("netstat -anp |grep snmptrapd").read()
+    pattern = re.compile(r'(\d+)/snmptrapd')
+    for process_id in pattern.findall(result):
+        os.popen("kill " + process_id)
+    return
+
+def _start_snmptrapd_service():
+    os.popen("snmptrapd -c /etc/snmp/snmptrapd.conf")
+    if(os.popen("echo $?").read() == "0\n"):
+        logging.info("have started the snmptrapd service")
+    else:
+        logging.warning("Exception occurs when start snmptrapd service")
+    return
+
+def _check_file_exist(file_name, position):
+    path = position + '/' + file_name
+    if os.path.exists(path):
+        return True
+    else:
+        return False
+
+def _create_file_in_specified_position(fileName, position):
+    path = position + '/' + fileName
+    try:
+        f = open(path, 'xt')
+        f.close()
+    except OSError as e:
+        print(e)    
+    return 
+
+def _check_content_exist(content, file_name, position):
+    path = position + '/' + file_name
+    try:
+        with open(path, 'rt') as f:
+            for line in f:
+                num_index = line.find(content)
+                if num_index != -1:
+                    return True
+            return False                        
+    except OSError as e:
+        print(e)            
+
+def _add_command_to_file(command, file_name, position):
+    path = position + '/' + file_name
+    try:
+        with open(path, 'at') as f:
+            f.write(command) 
+            f.close()
+    except OSError as e:
+        print(e)                   
+    return
+
+def _check_ip_legal(subscriber_ip):
+    result_ipv4 = False
+    result_ipv6 = False
+    try:
+        socket.inet_pton(socket.AF_INET, subscriber_ip)
+        result_ipv4 = True
+    except socket.error:
+        pass
+    try:
+        socket.inet_pton(socket.AF_INET6, subscriber_ip)
+        result_ipv6 = True
+    except socket.error:
+        pass    
+    return result_ipv4 or result_ipv6
+    
+def _check_port_legal(subscriber_port):
+    if subscriber_port >= 0 and subscriber_port <= 65535 and isinstance(subscriber_port, int):
+        return True
+    else:
+        return False
+    
+def subscribe_snmp_server(subscriber_ip, subscriber_port):    
+           
+    try:
+        if not checkIpLegal(subscriberIP):
+            return -1, gettext("the subscriber's ip is not legal")
+        if not checkPortLegal(subscriberPort):
+            return -1, gettext("the subscriber's port is not legal")
+        command_add_subsriber = FORWARD_TRAPS_COMMAND + subscriberIP + ":" + subscriberPort
+        if _check_file_exist(SNMPTRAPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+            if _check_content_exist(command_add_subsriber, SNMP_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+                return 0, gettext('subscribed that server before')
+        else:
+            _create_file_in_specified_position(SNMPTRAPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)
+        _add_command_to_file(command_add_subsriber, SNMPTRAPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)
+        _stop_snmpd_service()
+        _start_snmpd_service()
+        return 0, gettext('Subscribe the snmp server successfully')
+    except Exception as e:
+        logging.error()
+        return -1, gettext('Fail to subscribe the snmp server')
+
+def include_MIB(all):
+    if(all is 'y'):
+        try:
+            if _check_file_exist(SNMP_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+                if _check_content_exist(INCLUDE_MIB_COMMAND, SNMP_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+                    return 0, gettext('included all MIB files before')
+            else:
+                _create_file_in_specified_position(SNMP_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)    
+            _add_command_to_file(INCLUDE_MIB_COMMAND, SNMP_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)
+            _stop_snmpd_service()
+            _start_snmpd_service()
+            return 0, gettext('Include all MIB files to net-snmp successfully')
+        except Exception:
+            logging.error()
+            return -1, gettext('Fail to include all MIB files to net-snmp, please check log, thanks!')
+    elif(all is 'n'):
+        return -1, gettext('action is not supported till now')
+
+def set_snmp_proxy_v3(ctx_name, user, auth_protocol, auth_pass_phrase, privacy_protocol, privacy_pass_phrase, level, ip):
+
+    command_set_snmp_proxy = "proxy -Cn " + ctx_name + " -v 3 -u " + user + " -a " + auth_protocol + \
+                            " -A " + auth_pass_phrase + " -x " + privacy_protocol + " -X " + privacy_pass_phrase + \
+                            " -l " + level + ' ' + ip + " .1.3\n" 
+    if _check_file_exist(SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+        if _check_content_exist(ctx_name, SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+            return -1, gettext('ctx_name has been used')
+    else:
+        _create_file_in_specified_position(SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)    
+    _add_command_to_file(command_set_snmp_proxy, SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)
+    _stop_snmpd_service()
+    _start_snmpd_service()
+    
+    return 0, gettext("set snmp proxy successfully")
+
+def set_snmp_proxy_v1(ctx_name, cmty_name, community, ip):    
+    command_set_snmp_proxy = "com2sec -Cn " + ctx_name + " notConfigUser default " + cmty_name + "\n" + \
+                            "view systemview include .1.3\n" + \
+                            "access notConfigGroup ctx_remotehost any noauth prefix systemview none none\n" + \
+                            "proxy -Cn " + ctx_name + " -v 2c -c " + community + " " + ip + ".1.3\n"
+    if _check_file_exist(SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+        if _check_content_exist(ctx_name, SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION):
+            return -1, gettext('ctx_name has been used')
+    else:
+        _create_file_in_specified_position(SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)    
+    _add_command_to_file(command_set_snmp_proxy, SNMPD_CONF_FILE, SNMP_CONF_DEFAULT_POSITION)
+    _stop_snmpd_service()
+    _start_snmpd_service()
+                            
+    return 0, gettext("set snmp proxy successfully")
